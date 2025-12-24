@@ -1,4 +1,6 @@
 #[cfg(target_os = "windows")]
+use crate::utils::dirs::PathBufExec as _;
+#[cfg(target_os = "windows")]
 use crate::utils::schtasks as startup_task;
 use crate::{
     config::{Config, IVerge},
@@ -12,6 +14,8 @@ use clash_verge_logging::{Type, logging};
 use parking_lot::RwLock;
 use scopeguard::defer;
 use smartstring::alias::String;
+#[cfg(target_os = "windows")]
+use std::path::PathBuf;
 use std::{
     sync::{
         Arc,
@@ -49,6 +53,34 @@ static DEFAULT_BYPASS: &str = "localhost,127.0.0.1,192.168.0.0/16,10.0.0.0/8,172
 #[cfg(target_os = "macos")]
 static DEFAULT_BYPASS: &str =
     "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,localhost,*.local,*.crashlytics.com,<local>";
+
+#[cfg(target_os = "windows")]
+fn get_startup_dir() -> Result<PathBuf> {
+    let appdata = std::env::var("APPDATA").map_err(|_| anyhow!("failed to read APPDATA env var"))?;
+    let startup_dir = PathBuf::from(appdata)
+        .join("Microsoft")
+        .join("Windows")
+        .join("Start Menu")
+        .join("Programs")
+        .join("Startup");
+
+    if !startup_dir.exists() {
+        return Err(anyhow!("startup folder does not exist: {:?}", startup_dir));
+    }
+
+    Ok(startup_dir)
+}
+
+#[cfg(target_os = "windows")]
+async fn cleanup_legacy_startup_shortcuts() -> Result<()> {
+    let startup_dir = get_startup_dir()?;
+    let old_shortcut = startup_dir.join("Clash-Verge.lnk");
+    let new_shortcut = startup_dir.join("Clash Verge.lnk");
+
+    old_shortcut.remove_if_exists().await?;
+    new_shortcut.remove_if_exists().await?;
+    Ok(())
+}
 
 async fn get_bypass() -> String {
     let use_default = Config::verge().await.latest_arc().use_default_bypass.unwrap_or(true);
@@ -236,6 +268,10 @@ impl Sysopt {
 
         #[cfg(target_os = "windows")]
         {
+            if let Err(err) = cleanup_legacy_startup_shortcuts().await {
+                logging!(warn, Type::Setup, "Failed to cleanup legacy startup shortcuts: {}", err);
+            }
+
             let is_admin = is_current_app_handle_admin(Handle::app_handle());
             if is_admin {
                 self.update_launch_for_admin(is_enable)
