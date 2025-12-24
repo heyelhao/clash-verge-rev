@@ -1,6 +1,6 @@
 use crate::{
     config::{Config, IVerge},
-    core::{CoreManager, handle, hotkey, sysopt, tray},
+    core::{CoreManager, autostart, handle, hotkey, sysopt, tray},
     module::{auto_backup::AutoBackupManager, lightweight},
 };
 use anyhow::Result;
@@ -210,7 +210,7 @@ async fn process_terminated_flags(update_flags: i32, patch: &IVerge) -> Result<(
         handle::Handle::refresh_verge();
     }
     if (update_flags & (UpdateFlags::Launch as i32)) != 0 {
-        sysopt::Sysopt::global().update_launch().await?;
+        autostart::update_launch().await?;
     }
     if (update_flags & (UpdateFlags::SysProxy as i32)) != 0 {
         sysopt::Sysopt::global().update_sysproxy().await?;

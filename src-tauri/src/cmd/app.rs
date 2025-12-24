@@ -1,5 +1,5 @@
 use super::CmdResult;
-use crate::core::sysopt::Sysopt;
+use crate::core::autostart;
 use crate::utils::resolve::ui::{self, UiReadyStage};
 use crate::{
     cmd::StringifyErr as _,
@@ -96,7 +96,7 @@ pub fn get_app_dir() -> CmdResult<String> {
 /// 获取当前自启动状态
 #[tauri::command]
 pub fn get_auto_launch_status() -> CmdResult<bool> {
-    Sysopt::global().get_launch_status().stringify_err()
+    autostart::get_launch_status().stringify_err()
 }
 
 /// 下载图标缓存
